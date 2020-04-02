@@ -1066,7 +1066,8 @@ This is required for in-place content refreshing."
          (q4/append img q4/threadpics))
        (insert-button (concat file ext)
         :q4type 'image 'face 'q4/gray-face
-        'action `(lambda (b) (q4/load-image ,img)))
+        'action `(lambda (b) (q4/load-image ,img))
+       	'mouse-action `(lambda (b) (q4-override/wget-image ,img)))
        (insert "\n")
        (q4/append (cons no thumb) q4/thumblist)
        (if (and (display-graphic-p) q4/thumbnails)
@@ -1912,3 +1913,6 @@ thread number."
   (q4/seek-post post nil t))
 
 ;; HI IM DAISY
+
+
+(provide 'q4)
