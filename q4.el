@@ -1776,7 +1776,7 @@ buffer is left unmodified."
                    ,@(when (eq q4/thumbnail-method
                                #'q4/async-thumbnail-dispatch)
                        (list q4/thumblist))))))
-      (pop-to-buffer reply-buffer))))
+      (pop-to-buffer-same-window reply-buffer))))
 
 
 (defun q4/load-image (addr)
