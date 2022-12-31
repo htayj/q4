@@ -758,11 +758,11 @@ the current post has an image, includes an option for it as well."
       (setq response (read-char prompt)))
     (cond
      ((member response buffer)
-      (browse-url q4/extlink))
+      (browse-url-generic q4/extlink))
      ((member response post)
-      (browse-url postlink))
+      (browse-url-generic postlink))
      ((member response image)
-      (browse-url imglink))
+      (browse-url-generic imglink))
      ((member response gtfo)
       (message "Nevermind then!")))))
 
