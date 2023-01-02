@@ -1937,6 +1937,89 @@ thread number."
   (q4/seek-post post nil t))
 
 ;; HI IM DAISY
+;; auth login with pass
+
+(defvar q4/base-auth "https://sys.4channel.org/"
+  "Base URL for auth requests.")
+
+(defun q4/post-auth (id pin )
+  "DO NOT call directly.
+Logs the user in using 4chan pass.  The result is stored in a cookie.
+ID the pass id
+PIN the pass pin
+
+Note: 4chan.org and 4channel.org both seem to use 
+4channel.org to get the cookie, and the difference 
+is just the site for which the cookie is stored
+TODO: show the user a friendly message of success/fail
+TODO: how often does the user need to do this?"
+  (let ((url-request-extra-headers
+         '(("Accept-Encoding" . "gzip, deflate, br")
+           ("Connection" . "close")
+           ("Content-Type" . "application/x-www-form-urlencoded")))
+        (endpoint (concat q4/base-auth "auth"))
+        (url-request-data (format "id=%s&pin=%s" id pin ))
+        (url-request-method "POST"))
+    (with-current-buffer (url-retrieve-synchronously endpoint)
+            (buffer-string))
+    (message url-request-data)
+    ))
+
+(defun q4/4chan-credentials (address)
+  "DO NOT call directly.  
+Use auth-sources to login to 4chan pass using `q4/post-auth'.
+ADDRESS the address to log in to."
+  (let* ((auth-source-creation-prompts
+          '((id  . "ID at %h: ")
+            (pin . "PIN at %h: ")))
+         (found (nth 0 (auth-source-search :max 1
+                                           :host address
+                                           :require '(:id :pin)
+                                           :create t))))
+    (if found
+        (q4/post-auth (plist-get found :id) (plist-get found :pin))
+      nil)))
+(defun q4/4chan-login ()
+  "Log in to the 4chan pass.  
+Add your credentials to .authinfo (or your preferred netrc)
+before calling.  use `auth-source-forget-all-cached' if you 
+end up with incorrect values
+
+see `q4/4chan-credentials'
+TODO: probably shouldnt require the user to do this manually, should be
+automatic based on whenever a post fails"
+  (interactive)
+  (q4/4chan-credentials q4/base-auth))
+;; posting: define minor mode like org-src-mode (use header-line-format)
+
+(defvar q4/reply-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "\C-c\C-c" 'q4/edit-reply-exit)
+    (define-key map "\C-c\C-k" 'q4/edit-reply-abort)
+    map))
+
+(defcustom q4/reply-persistent-message t
+  "Non-nil means show persistent exit help message while posting reply.
+The message is shown in the header-line, which will be created in the
+first line of the window showing the editing buffer."
+  :group 'q4
+  :type 'boolean)
+
+(define-minor-mode q4/reply-mode
+  "Minor mode for q4 reply buffer.
+\\<q4-mode-map>
+This minor mode is turned on in in the temporary buffer when composing a reply
+
+\\{q4/reply-mode-map}
+
+See also `q4/reply-mode-hook'. todo: add hook"
+  :lighter "q4Reply"
+  (when q4/reply-persistent-message
+    (setq header-line-format
+	  (substitute-command-keys
+	       "Post contents of buffer with `\\[org-edit-src-exit]' or abort with \
+`\\[org-edit-src-abort]'"))))
+
 
 
 (provide 'q4)
