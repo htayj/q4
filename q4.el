@@ -816,6 +816,15 @@ list. Press d to show the number of photos in the list."
       (if image (push-button image)
         (message "No image in this post.")))))
 
+(defun q4/save-post-image ()
+  "Opens the current post's image in feh."
+  (interactive)
+  (save-excursion
+    (q4/assert-post-start)
+    (let ((image (q4/next-prop 'image nil (q4/sep-pos))))
+      (if image (q4/save-image (button-get (button-at image)  :img ))
+        (message "No image in this post.")))))
+
 
 (defun q4/open-item ()
   "When in the catalog, this will open the current post in a new buffer.
@@ -909,6 +918,7 @@ newly loaded buffer after switching."
     "t" 'q4/toggle-thumbnails
     "T" 'q4/toggle-thumbnailing-method
     "i" 'q4/open-post-image
+    "w" 'q4/save-post-image
     "o" 'q4/open-item
     "@" 'rename-buffer
     "r" 'q4/show-replies
@@ -942,6 +952,7 @@ newly loaded buffer after switching."
   (local-set-key (kbd "a") 'q4/pass-to-feh)
   (local-set-key (kbd "A") 'q4/wget-threadpics)
   (local-set-key (kbd "i") 'q4/open-post-image)
+  (local-set-key (kbd "w") 'q4/save-post-image)
   (local-set-key (kbd "o") 'q4/open-item)
   (local-set-key (kbd "u") 'q4/list-urls)
   (local-set-key (kbd "U") 'q4/view-content-externally)
@@ -1065,7 +1076,9 @@ This is required for in-place content refreshing."
        (when q4/establish-data
          (q4/append img q4/threadpics))
        (insert-button (concat file ext)
-        :q4type 'image 'face 'q4/gray-face
+        :q4type 'image
+        :img `,img 
+        'face 'q4/gray-face
         'action `(lambda (b) (q4/load-image ,img))
        	'mouse-action `(lambda (b) (q4-override/wget-image ,img)))
        (insert "\n")
@@ -1792,6 +1805,17 @@ mpv depending on the file type."
       (start-process-shell-command
        "feh" nil (format "wget -O - %s | feh -FZ -" addr)))))
 
+(defun q4/save-image (addr)
+  "The callback attached to image buttons, which opens the image in feh or
+mpv depending on the file type."
+  (message "Loading file...")
+  (start-process-shell-command
+   "wget" nil (format
+               "wget -O \"%s\" %s "
+               (helm-read-file-name
+                (format "select filename to save %s:" addr)
+                :initial-input q4/photo-download-directory)
+               addr)))
 
 (defun q4/postprocess ()
   "Scans forward from current point position and applies cosmetic changes
