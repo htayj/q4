@@ -241,9 +241,11 @@ IDs if the user has chosen to use one. Also see `q4/show-tripfags'")
   "Acknowledge attention whores. When non-nil, will show tripcodes next to
 post IDs if the user has chosen to use one. Also see `q4/show-namefags'")
 
-(defvar q4/photo-download-directory "~/Pictures/q4/"
+(defcustom q4/photo-download-directory "~/Pictures/q4/"
   ;; TODO: Set this var to nil to prompt for new dir every time
-  "The top level folder where thread content can be downloaded to.")
+  "The top level folder where thread content can be downloaded to."
+  :group 'q4
+  :type 'directory)
 
 (defvar q4/show-countries t
   "Display country names or flags in supported boards (/pol/). See
@@ -920,6 +922,7 @@ newly loaded buffer after switching."
     "i" 'q4/open-post-image
     "w" 'q4/save-post-image
     "o" 'q4/open-item
+    ";" 'q4/dwim-open-reply-to-post
     "@" 'rename-buffer
     "r" 'q4/show-replies
     "R" 'q4/refresh-page
@@ -1965,6 +1968,84 @@ TODO: how often does the user need to do this?"
     (message url-request-data)
     ))
 
+(defvar q4/post-field-separator "---------------------------7777777")
+(defvar q4/post-content-type (format "multipart/form-data; boundary=%s" q4/post-field-separator))
+;; (defvar q4/body-section (concat q4/post-field-separator "\nContent-Disposition: form-data; name=\"%s\"\n\n%s\n" ))
+;; (defun q4/make-post-body (threadno contents)
+;;   (concat 
+;;        (format q4/body-section "MAX_FILE_SIZE" "4194304")
+;;        (format q4/body-section "mode" "regist")
+;;        (format q4/body-section "resto" threadno)
+;;        (format q4/body-section "name" "")
+;;        (format q4/body-section "email" "")
+;;        (format q4/body-section "com" contents)
+;;        (concat q4/post-field-separator "--")
+;;    ))
+
+;; (defvar q4/post-field-separator "---------------------------7777777")
+;; (defvar q4/body-section (concat q4/post-field-separator "%s=%s" ))
+;; (defun q4/make-body-section (f v)
+;;   ""
+;;   (concat (url-hexify-string f ) "=" (url-hexify-string v )))
+;; (defun q4/make-post-body (threadno contents)
+;;   ""
+;;   (message threadno)
+;;   (message  contents )
+;;   (let ( (newcont ( string-replace "\n" "%0A" ">>323 \n something" ) ) )
+;;     (message newcont))
+;;   ;; (message ( string-replace "\n" "%0A" contents ))
+;;   (message (url-hexify-string threadno ))
+;;   (message (url-hexify-string ( string-replace "\n" "%0A" contents ) ))
+;;   (concat 
+;;        (q4/make-body-section "MAX_FILE_SIZE" "4194304") "&"          
+;;        (q4/make-body-section "mode" "regist") "&"         
+;;        (q4/make-body-section "resto" threadno) "&"        
+;;        (q4/make-body-section "name" "thename") "&"       
+;;        (q4/make-body-section "email" "theemail") "&"      
+;;        (q4/make-body-section "com" contents)
+;;    ))
+(setq url-debug t)
+(defun q4/post-reply (threadno contents )
+  "DO NOT call directly.
+Logs the user in using 4chan pass.  The result is stored in a cookie.
+ID the pass id
+PIN the pass pin
+
+Note: 4chan.org and 4channel.org both seem to use 
+4channel.org to get the cookie, and the difference 
+is just the site for which the cookie is stored
+TODO: show the user a friendly message of success/fail
+TODO: how often does the user need to do this?"
+  (let ((url-request-extra-headers
+         '(("Accept-Encoding" . "gzip, deflate, br")
+           ("Connection" . "keep-alive")
+           ;; ("Content-Type" . "application/x-www-form-urlencoded")
+           ("Content-Type" . "multipart/form-data; boundary=---------------------------7777777")))
+        (endpoint (concat q4/base-auth q4/board "/" "post"))
+        (url-request-data (concat
+                           q4/post-field-separator
+                           (mapconcat (lambda (arg)
+                                        (concat 
+                                         (format "\nContent-Disposition: form-data; name=\"%s\"\n\n" (car arg))
+                                         (format "%s\n" (cdr arg))))
+                                        (list (cons "MAX_FILE_SIZE" "4194304")
+                                            (cons "mode" "regist")
+                                            (cons "resto" threadno)
+                                            (cons "name" "")
+                                            (cons "email" "")
+                                            (cons "com" contents)) 
+                                      q4/post-field-separator)
+                           q4/post-field-separator "--"))
+        ;; (url-request-data (q4/make-post-body threadno contents))
+        (url-request-method "POST"))
+    ;; (url-retrieve endpoint 'my-switch-to-url-buffer)
+    (message url-request-extra-headers)
+    (message url-request-data)))
+
+(defun my-switch-to-url-buffer (status)
+  "Switch to the buffer returned by `url-retreive'.
+    The buffer contains the raw HTTP response sent by the server."
+  (switch-to-buffer (current-buffer)))
 (defun q4/4chan-credentials (address)
   "DO NOT call directly.  
 Use auth-sources to login to 4chan pass using `q4/post-auth'.
@@ -1991,35 +2072,60 @@ automatic based on whenever a post fails"
   (interactive)
   (q4/4chan-credentials q4/base-auth))
 ;; posting: define minor mode like org-src-mode (use header-line-format)
+(defun q4/post-response (thread-number)
+  )
 
-(defvar q4/reply-mode-map
+(defun q4/edit-post-exit ()
+ (interactive) 
+ (q4/post-reply q4/threadno (buffer-string) ))
+
+(defvar q4/post-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "\C-c\C-c" 'q4/edit-reply-exit)
-    (define-key map "\C-c\C-k" 'q4/edit-reply-abort)
+    (define-key map "\C-c\C-c" 'q4/edit-post-exit)
+    (define-key map "\C-c\C-k" 'q4/edit-post-abort)
     map))
 
-(defcustom q4/reply-persistent-message t
-  "Non-nil means show persistent exit help message while posting reply.
+(defcustom q4/post-persistent-message t
+  "Non-nil means show persistent exit help message while posting post.
 The message is shown in the header-line, which will be created in the
 first line of the window showing the editing buffer."
   :group 'q4
   :type 'boolean)
 
-(define-minor-mode q4/reply-mode
-  "Minor mode for q4 reply buffer.
+(define-minor-mode q4/post-mode
+  "Minor mode for q4 post buffer.
 \\<q4-mode-map>
-This minor mode is turned on in in the temporary buffer when composing a reply
+This minor mode is turned on in in the temporary buffer when composing a post
 
-\\{q4/reply-mode-map}
+\\{q4/post-mode-map}
 
-See also `q4/reply-mode-hook'. todo: add hook"
-  :lighter "q4Reply"
-  (when q4/reply-persistent-message
+TODO: make words wrap
+See also `q4/post-mode-hook'. todo: add hook"
+  :lighter "q4post"
+  (when q4/post-persistent-message
     (setq header-line-format
 	  (substitute-command-keys
-	       "Post contents of buffer with `\\[org-edit-src-exit]' or abort with \
-`\\[org-edit-src-abort]'"))))
+	       "Post contents of buffer with `\\[q4/edit-post-exit]' or abort with \
+`\\[q4/edit-post-abort]'"))))
 
+(defun q4/dwim-open-reply-to-post (&optional full)
+  "TODO: when full is true quote the text of the post being replied to."
+  (interactive)
+  (let* ((reply-buffer-name (concat (buffer-name) " *REPLY*" ))
+         (post-number (q4/current-post t))
+         (orig-threadno q4/threadno)
+         (orig-board q4/board))
+    (message reply-buffer-name)
+    (unless (get-buffer reply-buffer-name)
+      (q4/open-reply-buffer reply-buffer-name) (setq q4/board orig-board) (setq q4/threadno orig-threadno))
+    (q4/add-quote-open-buffer reply-buffer-name post-number full)))
 
+(defun q4/open-reply-buffer (reply-buffer-name)
+  (switch-to-buffer-other-window reply-buffer-name)
+  (q4/post-mode))
+
+(defun q4/add-quote-open-buffer (reply-buffer-name post-number &optional full)
+  (with-current-buffer reply-buffer-name
+    (insert (format ">>%s\n" post-number ))))
 
 (provide 'q4)

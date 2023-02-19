@@ -41,3 +41,6 @@
 ** TODO get /pol/ flags centered in the row instead of at the bottom (looks weird af)
 ** TODO /pol/ ID support
     
+** allow marking threads/posts to do action on them
+** correct urls that are deformed to get around censor
+** posting only with 4chan pass
